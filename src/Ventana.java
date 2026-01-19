@@ -10,35 +10,41 @@ import java.io.IOException;
 public class Ventana extends JFrame {
     private JTabbedPane tabbedPane;
     private Sistema sistema = new Sistema();
-    private DefaultListModel<String> modeloListaCitas = new DefaultListModel<>();
+
+    //Labels
     private JLabel lblDiaSeleccionado = new JLabel("Seleccione un día");
-    private DefaultListModel<String> modeloListaRecordatorios = new DefaultListModel<>();
-    private JTable tablaReporte;
     private JLabel lblTotalCitas = new JLabel("0");
     private JLabel lblAsistencias = new JLabel("0");
     private JLabel lblCanceladas = new JLabel("0");
+
+    //Tablas
     private DefaultTableModel modeloTablaReportes;
     private DefaultTableModel modeloTablaAdmin;
     private DefaultTableModel modeloTablaPacientes;
+    private JTable tablaReporte;
+
+    //DFL
+    private DefaultListModel<String> modeloListaRecordatorios = new DefaultListModel<>();
+    private DefaultListModel<String> modeloListaCitas = new DefaultListModel<>();
 
 
     public Ventana() {
         sistema.cargarDatos();
-        // 1. Look & Feel: Hace que se vea como Windows/Mac y no como Java antiguo
+        // Look & Feel: Hace que se vea como Windows/Mac y no como Java antiguo
         try {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
         } catch (Exception e) {
             e.printStackTrace();
         }
 
-        // 2. Configuración básica
+        // Configuración básica
         setTitle("PsyCare Scheduler");
         setSize(900, 700);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null); // Centra la ventana
         setLayout(new BorderLayout());
 
-        // 3. Inicializar el TabbedPane (Las pestañas) 
+        // Inicializar el TabbedPane
         tabbedPane = new JTabbedPane();
 
         // Añadimos las pestañas principales
@@ -68,11 +74,7 @@ public class Ventana extends JFrame {
     }
 
     private void cargarTablasAlInicio() {
-        // 1. Cargar Pacientes (Esto faltaba)
-        // Buscamos el modelo de la tabla de pacientes.
-        // Como lo declaraste localmente en crearPanelPacientes,
-        // lo ideal es que lo hagas global como modeloTablaAdmin.
-        // Si ya es global (ej: modeloTablaPacientes), úsalo así:
+        // Cargar Pacientes
         if (modeloTablaPacientes != null) {
             modeloTablaPacientes.setRowCount(0);
             for (Paciente p : sistema.getListaPacientes()) {
@@ -80,7 +82,7 @@ public class Ventana extends JFrame {
             }
         }
 
-        // 2. Cargar Usuarios
+        // Cargar Usuarios
         if (modeloTablaAdmin != null) {
             modeloTablaAdmin.setRowCount(0);
             for (Usuario u : sistema.getListaUsuarios()) {
@@ -88,7 +90,7 @@ public class Ventana extends JFrame {
             }
         }
 
-        // 3. Cargar Recordatorios
+        // Cargar Recordatorios
         modeloListaRecordatorios.clear();
         for (Recordatorio r : sistema.getListaRecordatorios()) {
             String entry = "🔔 ID:" + r.getIdRecordatorio() + " - Cita:" + r.getIdCita() + " - " + r.getMedio() + " (" + r.getAnticipacion() + ")";
@@ -99,6 +101,7 @@ public class Ventana extends JFrame {
         JPanel panelPrincipal = new JPanel(new BorderLayout(15, 15));
         panelPrincipal.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
+        //============================================================================================================
         // --- FORMULARIO IZQUIERDO ---
         JPanel panelForm = new JPanel(new GridBagLayout());
         panelForm.setBorder(BorderFactory.createTitledBorder("Registro de Pacientes"));
@@ -143,22 +146,15 @@ public class Ventana extends JFrame {
         gbc.insets = new Insets(20, 8, 8, 8);
         panelForm.add(btnRegistrar, gbc);
 
-        // --- TABLA DERECHA ---
-        String[] columnas = {"ID", "Nombre", "Teléfono", "Email"};
-        // Usamos DefaultTableModel para que sea funcional después
-        modeloTablaPacientes = new DefaultTableModel(columnas, 0);
-        JTable tablaPacientes = new JTable(modeloTablaPacientes);
-        JScrollPane scrollTabla = new JScrollPane(tablaPacientes);
-
         btnRegistrar.addActionListener(e -> {
             try {
-                // 1. Capturar datos de los campos de texto
+                // Capturar datos de los campos de texto
                 int id = Integer.parseInt(txtId.getText());
                 String nombre = txtNombre.getText();
                 String telf = txtTelefono.getText();
                 String email = txtEmail.getText();
 
-                // Construir la fecha (Paso importante para Métodos Numéricos o reportes después) [cite: 127]
+                // Construir la fecha
                 int dia = Integer.parseInt((String)cbDia.getSelectedItem());
                 int mes = cbMes.getSelectedIndex() + 1;
                 int anio = Integer.parseInt(txtAnio.getText());
@@ -171,29 +167,41 @@ public class Ventana extends JFrame {
                 LocalDate fechaNac = LocalDate.of(anio, mes, dia);
 
 
-                // 2. Validar
+                // Validar
                 if(sistema.buscarPacienteBinario(id) != -1) {
                     JOptionPane.showMessageDialog(this, "Error: El ID " + id + " ya está registrado.");
                     return;
                 }
 
-                // 3. Guardar en el "Cerebro" (Lógica)
+                // Guardar
                 Paciente nuevo = new Paciente(id, nombre, telf, email, fechaNac);
                 sistema.agregarPaciente(nuevo);
 
-                // 4. Actualizar la "Piel" (Interfaz - Tabla)
+                // Actualizar la interfaz visual
                 modeloTablaPacientes.addRow(new Object[]{id, nombre, telf, email});
 
-                // 5. Limpiar campos
+                //Limpiar campos
                 txtId.setText("");
                 txtNombre.setText("");
-                // ... limpiar los demás
+                txtTelefono.setText("");
+                txtEmail.setText("");
+                cbDia.setSelectedIndex(0);
+                cbMes.setSelectedIndex(0);
+                txtAnio.setText("2026");
 
             } catch (NumberFormatException ex) {
                 JOptionPane.showMessageDialog(this, "Por favor, verifica los datos numéricos.");
             }
         });
 
+        //============================================================================================================
+        // --- TABLA DERECHA ---
+        String[] columnas = {"ID", "Nombre", "Teléfono", "Email"};
+        modeloTablaPacientes = new DefaultTableModel(columnas, 0);
+        JTable tablaPacientes = new JTable(modeloTablaPacientes);
+        JScrollPane scrollTabla = new JScrollPane(tablaPacientes);
+
+        // Boton eliminar
         JButton btnEliminar = new JButton("Eliminar Seleccionado");
         btnEliminar.setBackground(new Color(255, 100, 100));
         btnEliminar.setPreferredSize(new Dimension(100, 35));// Un color rojizo para indicar precaución
@@ -219,10 +227,10 @@ public class Ventana extends JFrame {
                     "Confirmar Eliminación", JOptionPane.YES_NO_OPTION);
 
             if (respuesta == JOptionPane.YES_OPTION) {
-                // 1. Eliminar de la lógica (Sistema)
+                // Eliminar del sistema
                 int indiceEnSistema=sistema.buscarPacienteBinario(idEliminar);
                 if (indiceEnSistema != -1) {
-                    // 2. Eliminar de la interfaz (Tabla)
+                    // Eliminar de la interfaz
                     sistema.getListaPacientes().remove(indiceEnSistema);
                     modeloTablaPacientes.removeRow(filaSeleccionada);
                     JOptionPane.showMessageDialog(this, "Paciente eliminado con éxito.");
@@ -236,7 +244,7 @@ public class Ventana extends JFrame {
         return panelPrincipal;
     }
 
-    // Método auxiliar para los combos
+    // Metodo para cbobox
     private String[] generarNumeros(int inicio, int fin) {
         String[] nums = new String[fin - inicio + 1];
         for (int i = 0; i <= fin - inicio; i++) nums[i] = String.valueOf(inicio + i);
@@ -297,7 +305,7 @@ public class Ventana extends JFrame {
     private void actualizarListaCitasDelDia(int dia) {
         modeloListaCitas.clear();
         for (Cita c : sistema.getListaCitas()) {
-            // FILTRO CRÍTICO: Solo mostramos citas que sigan "Pendientes"
+            // Solo mostramos citas que sigan "Pendientes"
             if (c.getFechaHora().getDayOfMonth() == dia &&
                     c.getFechaHora().getMonthValue() == 1 &&
                     "Pendiente".equals(c.getEstado())) {
@@ -330,13 +338,13 @@ public class Ventana extends JFrame {
                 int dia = Integer.parseInt(txtDia.getText());
                 int hora = Integer.parseInt((String)cbHora.getSelectedItem());
 
-                // 1. Validar paciente
+                // Validar paciente
                 if (sistema.buscarPacienteBinario(idPac) == -1) {
                     JOptionPane.showMessageDialog(this, "El paciente no existe.");
                     return;
                 }
 
-                // 2. Crear fecha y guardar
+                // Crear fecha y guardar
                 LocalDateTime fecha = LocalDateTime.of(2026, 1, dia, hora, 0);
                 Cita nueva = new Cita(sistema.getListaCitas().size() + 1, idPac, fecha, "Consulta");
                 sistema.agregarCita(nueva);
@@ -425,7 +433,7 @@ public class Ventana extends JFrame {
         JButton btnEliminarUsuario = new JButton("Eliminar Usuario");
         btnEliminarUsuario.setBackground(new Color(255, 100, 100)); // Color de alerta
 
-// Ubícalo en la siguiente fila de tu GridBagLayout (gbc.gridy = 5)
+        // Ubicación botón en la interfaz
         gbc.gridx = 0; gbc.gridy = 5; gbc.gridwidth = 2;
         panelForm.add(btnEliminarUsuario, gbc);
 
@@ -446,9 +454,7 @@ public class Ventana extends JFrame {
                     "Confirmar acción", JOptionPane.YES_NO_OPTION);
 
             if (confirmar == JOptionPane.YES_OPTION) {
-                // 1. Eliminar de la lógica usando búsqueda binaria
                 if (sistema.eliminarUsuario(idEliminar)) {
-                    // 2. Eliminar de la tabla visual
                     modeloTablaAdmin.removeRow(filaSeleccionada);
                     JOptionPane.showMessageDialog(this, "Usuario eliminado correctamente.");
                 }
@@ -496,7 +502,6 @@ public class Ventana extends JFrame {
         panelAccionesCita.add(btnCompletar);
         panelAccionesCita.add(btnCancelar);
 
-// Añade este panel arriba del botón "Actualizar Datos"
         panelPrincipal.add(panelAccionesCita, BorderLayout.SOUTH);
 
         JButton btnExportar = new JButton("Exportar Reporte a PDF/Texto");
@@ -553,14 +558,14 @@ public class Ventana extends JFrame {
     }
 
     private void calcularEstadisticas() {
-        // 1. Limpiar los datos actuales de la tabla en la interfaz
+        // Limpiar los datos actuales de la tabla en la interfaz
         modeloTablaReportes.setRowCount(0);
 
         int totales = 0;
         int asistencias = 0;
         int canceladas = 0;
 
-        // 2. Recorrer la lista de citas que está en el "Cerebro" (Sistema)
+        // Recorrer la lista de citas que está en el Sistema
         for (Cita c : sistema.getListaCitas()) {
             totales++;
 
@@ -572,7 +577,7 @@ public class Ventana extends JFrame {
             int idx = sistema.buscarPacienteBinario(c.getIdPaciente());
             String nombrePac = (idx != -1) ? sistema.getListaPacientes().get(idx).getNombre() : "Desconocido";
 
-            // 3. Agregar la fila a la tabla visual
+            // Agregar la fila a la tabla visual
             modeloTablaReportes.addRow(new Object[]{
                     c.getIdCita(),
                     nombrePac,
@@ -581,7 +586,7 @@ public class Ventana extends JFrame {
             });
         }
 
-        // 4. Actualizar los cuadros de colores (Labels)
+        // Actualizar los cuadros de colores (Labels)
         lblTotalCitas.setText(String.valueOf(totales));
         lblAsistencias.setText(String.valueOf(asistencias));
         lblCanceladas.setText(String.valueOf(canceladas));
