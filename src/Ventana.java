@@ -10,6 +10,7 @@ import java.io.IOException;
 public class Ventana extends JFrame {
     private JTabbedPane tabbedPane;
     private Sistema sistema = new Sistema();
+    private JPanel calPanel;
 
     //Labels
     private JLabel lblDiaSeleccionado = new JLabel("Seleccione un día");
@@ -262,7 +263,7 @@ public class Ventana extends JFrame {
         header.add(lblMes, BorderLayout.CENTER);
 
         // --- CALENDARIO ---
-        JPanel calPanel = new JPanel(new GridLayout(0, 7));
+        calPanel = new JPanel(new GridLayout(0, 7));
         String[] diasSemana = {"Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"};
         for (String d : diasSemana) {
             calPanel.add(new JLabel(d, SwingConstants.CENTER));
@@ -270,10 +271,20 @@ public class Ventana extends JFrame {
 
         for (int i = 1; i <= 31; i++) {
             int diaActual = i;
-            JButton btnDia = new JButton(String.valueOf(i));
-            btnDia.setBackground(Color.WHITE);
 
-            // EVENTO: Al hacer clic en un día, mostrar sus citas
+            int contador = 0;
+            for (Cita c : sistema.getListaCitas()) {
+                if (c.getFechaHora().getDayOfMonth() == diaActual &&
+                        "Pendiente".equals(c.getEstado())) {
+                    contador++;
+                }
+            }
+
+            String textoBoton = (contador > 0) ? i + " (" + contador + ")" : String.valueOf(i);
+            JButton btnDia = new JButton(textoBoton);
+
+            if (contador > 0) btnDia.setBackground(new Color(255, 230, 150));
+            else btnDia.setBackground(Color.WHITE);
             btnDia.addActionListener(e -> {
                 lblDiaSeleccionado.setText("Día seleccionado: " + diaActual);
                 actualizarListaCitasDelDia(diaActual);
@@ -313,7 +324,7 @@ public class Ventana extends JFrame {
                 int idx = sistema.buscarPacienteBinario(c.getIdPaciente());
                 String nombrePac = (idx != -1) ? sistema.getListaPacientes().get(idx).getNombre() : "Desconocido";
 
-                modeloListaCitas.addElement(c.getFechaHora().getHour() + ":00 - " + nombrePac + " - ID: " + c.getIdCita());
+                modeloListaCitas.addElement(c.getFechaHora().getHour() + ":00 - " + nombrePac + " - ID: " + c.getIdCita() + " - Fecha: " + c.getFechaHora());
             }
         }
         if (modeloListaCitas.isEmpty()) {
@@ -325,8 +336,33 @@ public class Ventana extends JFrame {
         JTextField txtIdPac = new JTextField();
         JTextField txtDia = new JTextField();
         JComboBox<String> cbHora = new JComboBox<>(new String[]{"08", "09", "10", "14", "15", "16"});
+        JLabel lblNombrePaciente = new JLabel("Paciente: (No verificado)");
+        lblNombrePaciente.setFont(new Font("Arial", Font.ITALIC, 12));
+
+        JButton btnVerificar = new JButton("Verificar ID");
+
+        // Lógica para buscar el nombre antes de agendar
+        btnVerificar.addActionListener(e -> {
+            try {
+                int id = Integer.parseInt(txtIdPac.getText());
+                int idx = sistema.buscarPacienteBinario(id); // Uso de búsqueda binaria
+                if (idx != -1) {
+                    String nombre = sistema.getListaPacientes().get(idx).getNombre();
+                    lblNombrePaciente.setText("Paciente: " + nombre);
+                    lblNombrePaciente.setForeground(new Color(0, 150, 0));
+                } else {
+                    lblNombrePaciente.setText("Paciente: No encontrado");
+                    lblNombrePaciente.setForeground(Color.RED);
+                }
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(null, "Ingrese un ID numérico.");
+            }
+        });
+
         Object[] message = {
                 "ID Paciente:", txtIdPac,
+                btnVerificar,
+                lblNombrePaciente,
                 "Día del mes (1-31):", txtDia,
                 "Hora:", cbHora
         };
@@ -338,19 +374,26 @@ public class Ventana extends JFrame {
                 int dia = Integer.parseInt(txtDia.getText());
                 int hora = Integer.parseInt((String)cbHora.getSelectedItem());
 
-                // Validar paciente
                 if (sistema.buscarPacienteBinario(idPac) == -1) {
                     JOptionPane.showMessageDialog(this, "El paciente no existe.");
                     return;
                 }
 
-                // Crear fecha y guardar
                 LocalDateTime fecha = LocalDateTime.of(2026, 1, dia, hora, 0);
-                Cita nueva = new Cita(sistema.getListaCitas().size() + 1, idPac, fecha, "Consulta");
+                LocalDate soloFecha = LocalDate.of(2026, 1, dia);
+
+                // Validación de colisión de horarios
+                if (sistema.existeCitaEnHorario(fecha)) {
+                    JOptionPane.showMessageDialog(this, "Horario ya ocupado.");
+                    return;
+                }
+
+                Cita nueva = new Cita(sistema.getListaCitas().size() + 1, idPac, fecha, "Consulta", soloFecha);
                 sistema.agregarCita(nueva);
 
-                JOptionPane.showMessageDialog(this, "Cita agendada. Su cita tiene ID: " + nueva.getIdCita());
-                actualizarListaCitasDelDia(dia); // Refrescar vista
+                refrescarCalendario(); // Actualiza los números del calendario
+                actualizarListaCitasDelDia(dia);
+                JOptionPane.showMessageDialog(this, "Cita agendada. ID: " + nueva.getIdCita());
             } catch (Exception ex) {
                 JOptionPane.showMessageDialog(this, "Datos inválidos.");
             }
@@ -555,6 +598,7 @@ public class Ventana extends JFrame {
         }
 
         calcularEstadisticas(); // Refresca los contadores y la tabla inmediatamente
+        refrescarCalendario();
     }
 
     private void calcularEstadisticas() {
@@ -702,6 +746,41 @@ public class Ventana extends JFrame {
         panelPrincipal.add(split, BorderLayout.CENTER);
 
         return panelPrincipal;
+    }
+
+    private void refrescarCalendario() {
+        calPanel.removeAll(); // Borra los botones actuales
+
+        // Volver a poner los encabezados de los días
+        String[] diasSemana = {"Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"};
+        for (String d : diasSemana) {
+            calPanel.add(new JLabel(d, SwingConstants.CENTER));
+        }
+
+        // Volver a crear los botones con la lógica de conteo
+        for (int i = 1; i <= 31; i++) {
+            int diaActual = i;
+            int contador = 0;
+            for (Cita c : sistema.getListaCitas()) {
+                if (c.getFechaHora().getDayOfMonth() == diaActual && "Pendiente".equals(c.getEstado())) {
+                    contador++;
+                }
+            }
+
+            String textoBoton = (contador > 0) ? i + " (" + contador + ")" : String.valueOf(i);
+            JButton btnDia = new JButton(textoBoton);
+            if (contador > 0) btnDia.setBackground(new Color(255, 230, 150));
+            else btnDia.setBackground(Color.WHITE);
+
+            btnDia.addActionListener(e -> {
+                lblDiaSeleccionado.setText("Día seleccionado: " + diaActual);
+                actualizarListaCitasDelDia(diaActual);
+            });
+            calPanel.add(btnDia);
+        }
+
+        calPanel.revalidate(); // Avisa que el layout cambió
+        calPanel.repaint();    // Redibuja visualmente
     }
 
     public static void main(String[] args) {
